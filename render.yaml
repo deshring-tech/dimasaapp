@@ -1,0 +1,26 @@
+# Render Blueprint — deploys the Dimasa backend as a free web service.
+# Connect the GitHub repo on render.com and it picks this file up automatically.
+#
+# After first deploy, set these env vars in the Render dashboard:
+#   DATABASE_URL  → your Neon/Supabase Postgres connection string
+#   JWT_SECRET    → long random string (node -e "console.log(require('crypto').randomBytes(64).toString('hex'))")
+#   CLIENT_URL    → your Vercel frontend URL(s), comma-separated
+
+services:
+  - type: web
+    name: dimasa-api
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build:prod
+    startCommand: npm run start:prod
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false          # set manually in dashboard (secret)
+      - key: JWT_SECRET
+        sync: false          # set manually in dashboard (secret)
+      - key: CLIENT_URL
+        sync: false          # set manually after Vercel gives you the URL

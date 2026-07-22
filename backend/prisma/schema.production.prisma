@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  name      String?
+  age       Int?
+  gender    String?  // "male" | "female" | "other"
+  location  String?  // city / district — e.g. "Guwahati", "Haflong"
+  locality  String?  // neighborhood / area within location — e.g. "Beltola", "Zoo Road"
+  intent    String?  // "friends" | "dating" | "serious"
+  bio       String?
+  photoUrl  String?
+  isSetup   Boolean  @default(false)
+  isPremium Boolean  @default(false) // legacy — use tier instead
+  tier      String   @default("free") // "free" | "silver" | "gold" | "platinum"
+  tierExpiresAt DateTime?            // null = lifetime / no expiry tracked yet
+  dailyCount Int     @default(0)
+  lastSeen  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sentInterests     Interest[] @relation("SentInterests")
+  receivedInterests Interest[] @relation("ReceivedInterests")
+  matchesAsUser1    Match[]    @relation("MatchUser1")
+  matchesAsUser2    Match[]    @relation("MatchUser2")
+  sentMessages      Message[]
+  addedPlaces       Place[]    @relation("PlaceAdder")
+  ownedPlaces       Place[]    @relation("PlaceOwner")
+  posts             Post[]
+  postComments      Comment[]
+  postReactions     Reaction[]
+  follows           Follow[]
+}
+
+model OTP {
+  id        String   @id @default(cuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+}
+
+model Interest {
+  id         String   @id @default(cuid())
+  fromUser   User     @relation("SentInterests", fields: [fromUserId], references: [id])
+  fromUserId String
+  toUser     User     @relation("ReceivedInterests", fields: [toUserId], references: [id])
+  toUserId   String
+  createdAt  DateTime @default(now())
+
+  @@unique([fromUserId, toUserId])
+}
+
+model Match {
+  id        String    @id @default(cuid())
+  user1     User      @relation("MatchUser1", fields: [user1Id], references: [id])
+  user1Id   String
+  user2     User      @relation("MatchUser2", fields: [user2Id], references: [id])
+  user2Id   String
+  createdAt DateTime  @default(now())
+  messages  Message[]
+
+  @@unique([user1Id, user2Id])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  match     Match    @relation(fields: [matchId], references: [id])
+  matchId   String
+  sender    User     @relation(fields: [senderId], references: [id])
+  senderId  String
+  content   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([matchId])
+}
+
+// ─── Feed ─────────────────────────────────────────────────────────────────
+
+model Post {
+  id          String     @id @default(cuid())
+  author      User       @relation(fields: [authorId], references: [id])
+  authorId    String
+  content     String     // main text
+  imageUrl    String?    // optional image
+  place       Place?     @relation(fields: [placeId], references: [id])
+  placeId     String?    // optional: link to a business (for announcements)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @default(now()) @updatedAt
+
+  comments    Comment[]
+  reactions   Reaction[]
+
+  @@index([authorId])
+  @@index([placeId])
+  @@index([createdAt])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  author    User     @relation(fields: [authorId], references: [id])
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([postId])
+  @@index([authorId])
+}
+
+model Reaction {
+  id        String   @id @default(cuid())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId    String
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])  // one reaction per user per post
+  @@index([postId])
+}
+
+model Place {
+  id           String   @id @default(cuid())
+  name         String
+  type         String   // "hotel" | "restaurant" | "homestay" | "dhaba" | "cafe" | "shop" | "service"
+  district     String
+  address      String?
+  contact      String?  // primary phone
+  whatsapp     String?  // WhatsApp number (may differ from primary)
+  email        String?
+  imageUrl     String?  // cover image
+  gallery      String?  // JSON array of image URLs
+  description  String?  // rich description
+  hours        String?  // JSON e.g. {"mon":"9am–6pm", "tue":"9am–6pm"}
+  priceRange   String?  // "₹" | "₹₹" | "₹₹₹" | "₹₹₹₹"
+  tags         String?  // comma-separated searchable tags
+
+  addedBy      User?    @relation("PlaceAdder", fields: [addedById], references: [id])
+  addedById    String?
+  owner        User?    @relation("PlaceOwner", fields: [ownerId], references: [id])
+  ownerId      String?  // null = community-added, not-null = business claimed by owner
+
+  isApproved   Boolean  @default(true)
+  isClaimed    Boolean  @default(false)  // true if owner is set
+  views        Int      @default(0)      // simple total view counter
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @default(now()) @updatedAt
+
+  posts        Post[]
+  followers    Follow[]
+
+  @@index([district])
+  @@index([type])
+  @@index([ownerId])
+}
+
+model Follow {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  place     Place    @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  placeId   String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, placeId])
+  @@index([placeId])
+  @@index([userId])
+}
