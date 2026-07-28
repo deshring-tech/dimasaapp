@@ -9,7 +9,9 @@ datasource db {
 
 model User {
   id        String   @id @default(cuid())
-  phone     String   @unique
+  phone     String?  @unique  // optional — user may sign in with Google instead
+  email     String?  @unique  // from Google sign-in
+  googleId  String?  @unique  // Google account "sub" identifier
   name      String?
   age       Int?
   gender    String?  // "male" | "female" | "other"

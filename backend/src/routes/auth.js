@@ -3,7 +3,16 @@ const router = express.Router();
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const rateLimit = require("express-rate-limit");
+const { OAuth2Client } = require("google-auth-library");
 const prisma = require("../lib/prisma");
+
+// Google OAuth client (only used if GOOGLE_CLIENT_ID is configured)
+const googleClient = process.env.GOOGLE_CLIENT_ID
+  ? new OAuth2Client(process.env.GOOGLE_CLIENT_ID)
+  : null;
+
+const signToken = (userId) =>
+  jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: "30d" });
 
 // ─── Rate limiters ────────────────────────────────────────────────────────────
 const sendOtpLimiter = rateLimit({
@@ -167,6 +176,90 @@ router.post("/verify-otp", verifyOtpLimiter, async (req, res, next) => {
       user: {
         id: user.id,
         phone: user.phone,
+        isSetup: user.isSetup,
+        name: user.name,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Sign in with Google ─────────────────────────────────────────────────────
+// POST /api/auth/google   Body: { credential }  (Google ID token from GIS)
+const googleLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many attempts. Please wait and try again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post("/google", googleLimiter, async (req, res, next) => {
+  try {
+    if (!googleClient) {
+      return res.status(503).json({ error: "Google sign-in is not configured yet." });
+    }
+
+    const { credential } = req.body;
+    if (!credential || typeof credential !== "string") {
+      return res.status(400).json({ error: "Missing Google credential" });
+    }
+
+    // Verify the ID token with Google — proves it's genuine and for our app
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+    } catch {
+      return res.status(401).json({ error: "Invalid Google credential" });
+    }
+
+    const googleId = payload.sub;
+    const email = payload.email ? payload.email.toLowerCase() : null;
+    const name = payload.name || null;
+    const picture = payload.picture || null;
+
+    if (!googleId) {
+      return res.status(401).json({ error: "Could not read Google account" });
+    }
+
+    // Find by googleId first, then by email (link existing accounts), else create
+    let user =
+      (await prisma.user.findUnique({ where: { googleId } })) ||
+      (email ? await prisma.user.findUnique({ where: { email } }) : null);
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          googleId,
+          email,
+          name,
+          photoUrl: picture,
+        },
+      });
+    } else if (!user.googleId) {
+      // Link Google to an existing (e.g. phone) account
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { googleId, email: user.email || email, lastSeen: new Date() },
+      });
+    } else {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { lastSeen: new Date() },
+      });
+    }
+
+    res.json({
+      token: signToken(user.id),
+      user: {
+        id: user.id,
+        phone: user.phone,
+        email: user.email,
         isSetup: user.isSetup,
         name: user.name,
       },

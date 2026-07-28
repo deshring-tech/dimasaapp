@@ -14,3 +14,6 @@ export const API_BASE = `${API_ORIGIN}/api`;
 
 // Socket.IO target: explicit origin in prod, same-origin "/" in dev (proxied)
 export const SOCKET_URL = API_ORIGIN || "/";
+
+// Google Sign-In client ID. When unset, the Google button is hidden.
+export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";

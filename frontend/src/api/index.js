@@ -26,6 +26,7 @@ api.interceptors.response.use(
 // ── Auth ─────────────────────────────────────────────────────────────────────
 export const sendOTP = (phone) => api.post("/auth/send-otp", { phone });
 export const verifyOTP = (phone, code) => api.post("/auth/verify-otp", { phone, code });
+export const googleLogin = (credential) => api.post("/auth/google", { credential });
 
 // ── Users ────────────────────────────────────────────────────────────────────
 export const getMe = () => api.get("/users/me");

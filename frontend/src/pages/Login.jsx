@@ -1,7 +1,25 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { sendOTP, verifyOTP } from "../api";
+import { sendOTP, verifyOTP, googleLogin } from "../api";
 import { useAuth } from "../context/AuthContext";
+import GoogleButton from "../components/GoogleButton";
+import { GOOGLE_CLIENT_ID } from "../lib/config";
+
+// "or" divider + Google button — renders nothing if Google isn't configured,
+// so there's no empty divider when the client ID is absent.
+function GoogleSection({ onGoogle, loading }) {
+  if (!GOOGLE_CLIENT_ID) return null;
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-xs text-gray-400">or</span>
+        <div className="flex-1 h-px bg-gray-200" />
+      </div>
+      <GoogleButton onCredential={onGoogle} disabled={loading} />
+    </div>
+  );
+}
 
 export default function Login() {
   const [phone, setPhone] = useState("");
@@ -11,6 +29,20 @@ export default function Login() {
   const [error, setError] = useState("");
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  // ─── Google sign-in ─────────────────────────────────────────────────────
+  const handleGoogle = async (credential) => {
+    setError("");
+    setLoading(true);
+    try {
+      const res = await googleLogin(credential);
+      login(res.data.token, res.data.user);
+      navigate(res.data.user.isSetup ? "/home" : "/setup");
+    } catch (e) {
+      setError(e.response?.data?.error || "Google sign-in failed");
+      setLoading(false);
+    }
+  };
 
   const handleSendOTP = async () => {
     if (phone.length < 10) return setError("Enter a valid 10-digit phone number");
@@ -94,6 +126,9 @@ export default function Login() {
             <button className="btn-primary" onClick={handleSendOTP} disabled={loading}>
               {loading ? "Sending..." : "Send OTP →"}
             </button>
+
+            {/* Google sign-in (renders only if configured) */}
+            <GoogleSection onGoogle={handleGoogle} loading={loading} />
 
             <p className="text-xs text-gray-400 text-center">
               By continuing, you agree to our{" "}

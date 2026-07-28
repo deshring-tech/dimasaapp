@@ -11,21 +11,22 @@ const LOCATIONS = [
 const STEPS = ["basics", "photo", "intent"];
 
 export default function ProfileSetup() {
-  const { refreshUser } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const [form, setForm] = useState({
-    name: "",
+    // Pre-fill from Google sign-in when available
+    name: user?.name || "",
     age: "",
     gender: "",
     location: "",
     locality: "",
     intent: "",
     bio: "",
-    photoUrl: "",
+    photoUrl: user?.photoUrl || "",
   });
 
   const set = (field) => (e) =>
