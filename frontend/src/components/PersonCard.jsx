@@ -1,5 +1,3 @@
-import TierBadge from "./TierBadge";
-
 const GENDER_EMOJI = { female: "👩", male: "👨", other: "🧑" };
 
 // A single person tile shown in the community grid.
@@ -18,12 +16,6 @@ export default function PersonCard({ person, onOpen, onSayHi, sent, sameLocality
         ) : (
           <div className="w-full h-full flex items-center justify-center text-5xl">
             {GENDER_EMOJI[person.gender] || "🧑"}
-          </div>
-        )}
-        {/* Tier badge */}
-        {person.tier && person.tier !== "free" && (
-          <div className="absolute top-2 right-2">
-            <TierBadge tier={person.tier} size="xs" />
           </div>
         )}
         {/* Same-locality badge */}

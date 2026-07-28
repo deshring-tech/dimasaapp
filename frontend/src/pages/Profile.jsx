@@ -13,6 +13,8 @@ const LOCATIONS = [
 export default function Profile() {
   const navigate = useNavigate();
   const { user, refreshUser, logout } = useAuth();
+  // Memberships/tiers are a dating concept only. In community mode they're hidden.
+  const isCommunity = user?.intent === "friends";
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -131,7 +133,7 @@ export default function Profile() {
               <span className="inline-block mt-2 bg-rose-50 text-primary text-xs font-medium px-3 py-1 rounded-full">
                 {intentLabel[user?.intent] || user?.intent}
               </span>
-              {user?.tier && user.tier !== "free" && (
+              {!isCommunity && user?.tier && user.tier !== "free" && (
                 <span className="inline-block ml-2 align-middle">
                   <TierBadge tier={user.tier} />
                 </span>
@@ -245,8 +247,8 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Membership card */}
-        {!editing && (
+        {/* Membership card — dating concept only. Hidden in community mode. */}
+        {!editing && !isCommunity && (
           <button
             onClick={() => navigate("/membership")}
             className="w-full bg-gradient-to-br from-primary to-rose-600 rounded-2xl p-5 text-white text-left active:scale-[0.98] transition-transform"

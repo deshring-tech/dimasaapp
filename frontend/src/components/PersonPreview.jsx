@@ -1,5 +1,3 @@
-import TierBadge from "./TierBadge";
-
 const GENDER_EMOJI = { female: "👩", male: "👨", other: "🧑" };
 
 const INTENT_LABEL = {
@@ -34,11 +32,6 @@ export default function PersonPreview({ person, sent, onClose, onSayHi }) {
           ) : (
             <div className="w-full h-full flex items-center justify-center text-8xl">
               {GENDER_EMOJI[person.gender] || "🧑"}
-            </div>
-          )}
-          {person.tier && person.tier !== "free" && (
-            <div className="absolute top-3 right-3">
-              <TierBadge tier={person.tier} size="sm" />
             </div>
           )}
         </div>
