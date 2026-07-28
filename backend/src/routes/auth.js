@@ -102,8 +102,22 @@ router.post("/verify-otp", verifyOtpLimiter, async (req, res, next) => {
     const isDevBackdoor =
       process.env.NODE_ENV !== "production" && code === "000000";
 
+    // ─── Private admin login (works in production, gated by secrets) ──────
+    // Lets specific admin phone numbers log in with a private master code,
+    // without SMS. Set ADMIN_PHONES (comma-separated, e.g. "+919999999999")
+    // and ADMIN_OTP (a long secret only you know) in the environment.
+    // Remove both once a real SMS provider is wired.
+    const ADMIN_PHONES = (process.env.ADMIN_PHONES || "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const isAdminMasterLogin =
+      !!process.env.ADMIN_OTP &&
+      code === process.env.ADMIN_OTP &&
+      ADMIN_PHONES.includes(normalizedPhone);
+
     let otp = null;
-    if (!isDevBackdoor) {
+    if (!isDevBackdoor && !isAdminMasterLogin) {
       otp = await prisma.oTP.findFirst({
         where: {
           phone: normalizedPhone,
@@ -127,10 +141,15 @@ router.post("/verify-otp", verifyOtpLimiter, async (req, res, next) => {
       where: { phone: normalizedPhone, used: true },
     });
 
-    // Upsert user
+    // Upsert user (admin phones get Platinum automatically)
     let user = await prisma.user.findUnique({ where: { phone: normalizedPhone } });
     if (!user) {
-      user = await prisma.user.create({ data: { phone: normalizedPhone } });
+      user = await prisma.user.create({
+        data: {
+          phone: normalizedPhone,
+          ...(ADMIN_PHONES.includes(normalizedPhone) ? { tier: "platinum" } : {}),
+        },
+      });
     }
 
     await prisma.user.update({
