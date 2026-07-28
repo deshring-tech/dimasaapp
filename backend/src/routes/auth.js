@@ -110,7 +110,8 @@ router.post("/verify-otp", verifyOtpLimiter, async (req, res, next) => {
     const ADMIN_PHONES = (process.env.ADMIN_PHONES || "")
       .split(",")
       .map((s) => s.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .map((p) => normalizePhone(p)); // accept "9999999999" or "+919999999999"
     const isAdminMasterLogin =
       !!process.env.ADMIN_OTP &&
       code === process.env.ADMIN_OTP &&
