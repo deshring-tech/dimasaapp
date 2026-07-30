@@ -32,6 +32,35 @@ router.get("/liked-me", protect, async (req, res, next) => {
   }
 });
 
+// ─── Get a single match (who am I chatting with?) ───────────────────────────
+// GET /api/matches/:matchId/partner
+// Used by the chat screen so the header shows the person's name/photo even
+// before any messages exist.
+router.get("/:matchId/partner", protect, async (req, res, next) => {
+  try {
+    const { matchId } = req.params;
+    const userId = req.user.id;
+
+    const match = await prisma.match.findFirst({
+      where: {
+        id: matchId,
+        OR: [{ user1Id: userId }, { user2Id: userId }],
+      },
+      include: {
+        user1: { select: { id: true, name: true, photoUrl: true, location: true, locality: true, intent: true } },
+        user2: { select: { id: true, name: true, photoUrl: true, location: true, locality: true, intent: true } },
+      },
+    });
+
+    if (!match) return res.status(404).json({ error: "Match not found" });
+
+    const partner = match.user1Id === userId ? match.user2 : match.user1;
+    res.json({ matchId: match.id, partner });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // ─── Get All Matches ──────────────────────────────────────────────────────────
 // GET /api/matches
 router.get("/", protect, async (req, res, next) => {

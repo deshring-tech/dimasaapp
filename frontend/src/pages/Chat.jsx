@@ -111,7 +111,9 @@ export default function Chat() {
                   <p className={`text-sm truncate ${m.unread ? "text-gray-800 font-medium" : "text-gray-400"}`}>
                     {m.lastMessage
                       ? (m.lastMessage.senderId === user?.id ? "You: " : "") + m.lastMessage.content
-                      : "✨ New match! Say hello"}
+                      : words.community
+                        ? "🤝 New connection! Say hello"
+                        : "✨ New match! Say hello"}
                   </p>
                   {m.unread && (
                     <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0 ml-2" />

@@ -40,6 +40,7 @@ export const getUserById = (id) => api.get(`/users/${id}`);
 // ── Matches ──────────────────────────────────────────────────────────────────
 export const expressInterest = (targetId) => api.post(`/matches/interest/${targetId}`);
 export const getMatches = () => api.get("/matches");
+export const getChatPartner = (matchId) => api.get(`/matches/${matchId}/partner`);
 export const getLikedMe = () => api.get("/matches/liked-me");
 
 // ── Messages ─────────────────────────────────────────────────────────────────

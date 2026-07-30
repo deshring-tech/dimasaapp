@@ -39,11 +39,18 @@ export default function RealtimeListener() {
     // ─── Someone showed interest in you ──────────────────────────────────
     const onInterestReceived = ({ fromUser }) => {
       if (!fromUser) return;
+      const who = fromUser.name || "Someone";
       toast({
-        icon: isCommunity ? "🤝" : "❤️",
-        title: isCommunity ? "Someone wants to connect" : "Someone is interested",
-        body: `${fromUser.name} from ${fromUser.location || "Dimasa"}`,
+        icon: isCommunity ? "👋" : "❤️",
+        title: isCommunity
+          ? `${who} sent you a connection request`
+          : `${who} is interested in you`,
+        body: isCommunity
+          ? `From ${fromUser.location || "the Dimasa community"} — say hi back to connect`
+          : `From ${fromUser.location || "the Dimasa community"}`,
         tone: "info",
+        duration: 6000,
+        onClick: () => navigate("/matches"),
       });
     };
 
@@ -52,9 +59,13 @@ export default function RealtimeListener() {
       if (!otherUser) return;
       toast({
         icon: isCommunity ? "🤝" : "🎉",
-        title: isCommunity ? "Connected!" : "It's a Match!",
-        body: `You and ${otherUser.name} can now chat`,
-        tone: "match",
+        title: isCommunity
+          ? `You and ${otherUser.name} are now connected`
+          : "It's a Match!",
+        body: isCommunity
+          ? "Tap to start chatting"
+          : `You and ${otherUser.name} can now chat`,
+        tone: isCommunity ? "success" : "match",
         duration: 6000,
         onClick: () => navigate(`/chat/${match.id}`),
       });

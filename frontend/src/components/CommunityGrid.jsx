@@ -44,10 +44,10 @@ export default function CommunityGrid() {
       if (res.data.matched) {
         setMatchPopup(res.data.match);
         toast({
-          icon: "🎉",
-          title: "You're now connected!",
-          body: "Tap the match popup to chat",
-          tone: "match",
+          icon: "🤝",
+          title: "Connected!",
+          body: "You can now chat",
+          tone: "success",
         });
       } else {
         toast({

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { io } from "socket.io-client";
-import { getMessages } from "../api";
+import { getMessages, getChatPartner } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { modeWords } from "../lib/mode";
 import { SOCKET_URL } from "../lib/config";
@@ -37,6 +37,15 @@ export default function ChatRoom() {
   const typingTimeout = useRef(null);
   const sock = useRef(null);
 
+  // ── Who am I chatting with? (works even with zero messages) ──────────────
+  useEffect(() => {
+    getChatPartner(matchId)
+      .then((res) => {
+        if (res.data?.partner) setOtherUser(res.data.partner);
+      })
+      .catch(() => {}); // fall back to inferring from messages below
+  }, [matchId]);
+
   // ── Load message history ─────────────────────────────────────────────────
   useEffect(() => {
     getMessages(matchId)
@@ -44,8 +53,11 @@ export default function ChatRoom() {
         // API now returns { messages, nextCursor }
         const msgs = Array.isArray(res.data) ? res.data : res.data.messages ?? [];
         setMessages(msgs);
-        const other = msgs.find((m) => m.sender?.id !== user?.id)?.sender;
-        if (other) setOtherUser(other);
+        // Fallback: infer partner from messages if the partner call failed
+        setOtherUser((prev) => {
+          if (prev) return prev;
+          return msgs.find((m) => m.sender?.id !== user?.id)?.sender || null;
+        });
       })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -172,14 +184,19 @@ export default function ChatRoom() {
             : <span className="text-lg">👤</span>
           }
         </div>
-        <div className="flex-1">
-          <p className="font-semibold text-gray-800">{otherUser?.name || "Chat"}</p>
-          {typing
-            ? <p className="text-xs text-primary animate-pulse">typing...</p>
-            : connectionStatus === "offline"
-              ? <p className="text-xs text-red-400">Reconnecting...</p>
-              : null
-          }
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-800 truncate">
+            {otherUser?.name || (loading ? "…" : "Chat")}
+          </p>
+          {typing ? (
+            <p className="text-xs text-primary animate-pulse">typing...</p>
+          ) : connectionStatus === "offline" ? (
+            <p className="text-xs text-red-400">Reconnecting...</p>
+          ) : (otherUser?.locality || otherUser?.location) ? (
+            <p className="text-xs text-gray-400 truncate">
+              📍 {otherUser.locality || otherUser.location}
+            </p>
+          ) : null}
         </div>
       </div>
 
