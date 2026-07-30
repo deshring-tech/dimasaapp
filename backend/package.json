@@ -11,7 +11,7 @@
     "db:studio": "npx prisma studio",
     "db:seed": "node prisma/seed.js",
     "build:prod": "node -e \"require('fs').copyFileSync('prisma/schema.production.prisma','prisma/schema.prisma')\" && npx prisma generate",
-    "start:prod": "npx prisma db push --skip-generate && node prisma/seed.js && node server.js"
+    "start:prod": "npx prisma db push --skip-generate --accept-data-loss && node prisma/seed.js && node server.js"
   },
   "dependencies": {
     "@prisma/client": "^5.7.0",
