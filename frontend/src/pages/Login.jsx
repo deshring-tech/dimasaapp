@@ -3,23 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { sendOTP, verifyOTP, googleLogin } from "../api";
 import { useAuth } from "../context/AuthContext";
 import GoogleButton from "../components/GoogleButton";
-import { GOOGLE_CLIENT_ID } from "../lib/config";
-
-// "or" divider + Google button — renders nothing if Google isn't configured,
-// so there's no empty divider when the client ID is absent.
-function GoogleSection({ onGoogle, loading }) {
-  if (!GOOGLE_CLIENT_ID) return null;
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="flex-1 h-px bg-gray-200" />
-        <span className="text-xs text-gray-400">or</span>
-        <div className="flex-1 h-px bg-gray-200" />
-      </div>
-      <GoogleButton onCredential={onGoogle} disabled={loading} />
-    </div>
-  );
-}
+import { GOOGLE_CLIENT_ID, PHONE_LOGIN_ENABLED } from "../lib/config";
 
 export default function Login() {
   const [phone, setPhone] = useState("");
@@ -27,17 +11,22 @@ export default function Login() {
   const [step, setStep] = useState("phone"); // "phone" | "otp"
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Phone form is hidden until SMS is wired. Admins can reveal it manually.
+  const [showPhone, setShowPhone] = useState(PHONE_LOGIN_ENABLED);
   const { login } = useAuth();
   const navigate = useNavigate();
+
+  const finishLogin = (res) => {
+    login(res.data.token, res.data.user);
+    navigate(res.data.user.isSetup ? "/home" : "/setup");
+  };
 
   // ─── Google sign-in ─────────────────────────────────────────────────────
   const handleGoogle = async (credential) => {
     setError("");
     setLoading(true);
     try {
-      const res = await googleLogin(credential);
-      login(res.data.token, res.data.user);
-      navigate(res.data.user.isSetup ? "/home" : "/setup");
+      finishLogin(await googleLogin(credential));
     } catch (e) {
       setError(e.response?.data?.error || "Google sign-in failed");
       setLoading(false);
@@ -59,15 +48,13 @@ export default function Login() {
   };
 
   const handleVerifyOTP = async () => {
-    if (otp.length !== 6) return setError("Enter the 6-digit OTP");
+    if (otp.length !== 6) return setError("Enter the 6-digit code");
     setError("");
     setLoading(true);
     try {
-      const res = await verifyOTP(phone, otp);
-      login(res.data.token, res.data.user);
-      navigate(res.data.user.isSetup ? "/home" : "/setup");
+      finishLogin(await verifyOTP(phone, otp));
     } catch (e) {
-      setError(e.response?.data?.error || "Invalid OTP");
+      setError(e.response?.data?.error || "Invalid code");
     } finally {
       setLoading(false);
     }
@@ -78,9 +65,7 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      const res = await verifyOTP(devPhone, "000000");
-      login(res.data.token, res.data.user);
-      navigate(res.data.user.isSetup ? "/home" : "/setup");
+      finishLogin(await verifyOTP(devPhone, "000000"));
     } catch (e) {
       setError(e.response?.data?.error || "Dev login failed");
     } finally {
@@ -99,83 +84,12 @@ export default function Login() {
         </p>
       </div>
 
-      {/* Form */}
       <div className="flex-1 px-6 py-10">
-        {step === "phone" ? (
+        {step === "otp" ? (
+          /* ─── OTP verification step ──────────────────────────────────── */
           <div className="space-y-5">
             <div>
-              <h2 className="text-xl font-semibold text-gray-800">Enter your phone number</h2>
-              <p className="text-sm text-gray-400 mt-1">We'll send you a verification code</p>
-            </div>
-
-            <div className="flex gap-2">
-              <span className="input-field w-16 text-center text-gray-500 flex-shrink-0">+91</span>
-              <input
-                type="tel"
-                className="input-field flex-1"
-                placeholder="98765 43210"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                onKeyDown={(e) => e.key === "Enter" && handleSendOTP()}
-                maxLength={10}
-              />
-            </div>
-
-            {error && <p className="text-red-500 text-sm">{error}</p>}
-
-            <button className="btn-primary" onClick={handleSendOTP} disabled={loading}>
-              {loading ? "Sending..." : "Send OTP →"}
-            </button>
-
-            {/* Google sign-in (renders only if configured) */}
-            <GoogleSection onGoogle={handleGoogle} loading={loading} />
-
-            <p className="text-xs text-gray-400 text-center">
-              By continuing, you agree to our{" "}
-              <button onClick={() => navigate("/terms")} className="underline text-gray-500">Terms</button>
-              {" & "}
-              <button onClick={() => navigate("/privacy")} className="underline text-gray-500">Privacy Policy</button>
-            </p>
-
-            {/* ─── Dev-only: quick login shortcuts ────────────────────────── */}
-            {import.meta.env.DEV && (
-              <div className="border-t border-gray-100 pt-4 mt-2">
-                <p className="text-[10px] uppercase tracking-wider text-gray-400 text-center font-semibold mb-2">
-                  🔧 Dev Quick Login
-                </p>
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    onClick={() => handleDevLogin("9999999999")}
-                    disabled={loading}
-                    className="text-xs py-2 px-2 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 font-medium hover:bg-violet-100 disabled:opacity-50"
-                  >
-                    💎 Admin
-                  </button>
-                  <button
-                    onClick={() => handleDevLogin("8888888888")}
-                    disabled={loading}
-                    className="text-xs py-2 px-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 font-medium hover:bg-amber-100 disabled:opacity-50"
-                  >
-                    🥇 Dater
-                  </button>
-                  <button
-                    onClick={() => handleDevLogin("7777777777")}
-                    disabled={loading}
-                    className="text-xs py-2 px-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 font-medium hover:bg-emerald-100 disabled:opacity-50"
-                  >
-                    🤝 Friend
-                  </button>
-                </div>
-                <p className="text-[10px] text-gray-400 text-center mt-2">
-                  Or use any phone + OTP <code className="font-mono bg-gray-100 px-1 rounded">000000</code>
-                </p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-5">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-800">Enter OTP</h2>
+              <h2 className="text-xl font-semibold text-gray-800">Enter code</h2>
               <p className="text-sm text-gray-400 mt-1">
                 Sent to +91 {phone}{" "}
                 <button
@@ -208,8 +122,125 @@ export default function Login() {
               onClick={handleSendOTP}
               disabled={loading}
             >
-              Resend OTP
+              Resend code
             </button>
+          </div>
+        ) : (
+          /* ─── Primary sign-in step ───────────────────────────────────── */
+          <div className="space-y-6">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold text-gray-800">Welcome</h2>
+              <p className="text-sm text-gray-400 mt-1">
+                Sign in to join the Dimasa community
+              </p>
+            </div>
+
+            {/* Google — the primary way in */}
+            {GOOGLE_CLIENT_ID ? (
+              <GoogleButton onCredential={handleGoogle} disabled={loading} />
+            ) : (
+              <p className="text-sm text-gray-400 text-center">
+                Sign-in is being set up. Please check back shortly.
+              </p>
+            )}
+
+            {loading && (
+              <p className="text-xs text-gray-400 text-center">Signing you in…</p>
+            )}
+
+            {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
+            {/* Phone/OTP — hidden until SMS is wired (or revealed by admin) */}
+            {showPhone && (
+              <div className="space-y-4 pt-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-px bg-gray-200" />
+                  <span className="text-xs text-gray-400">or use phone</span>
+                  <div className="flex-1 h-px bg-gray-200" />
+                </div>
+
+                <div className="flex gap-2">
+                  <span className="input-field w-16 text-center text-gray-500 flex-shrink-0">
+                    +91
+                  </span>
+                  <input
+                    type="tel"
+                    className="input-field flex-1"
+                    placeholder="98765 43210"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                    onKeyDown={(e) => e.key === "Enter" && handleSendOTP()}
+                    maxLength={10}
+                  />
+                </div>
+
+                <button
+                  className="btn-primary"
+                  onClick={handleSendOTP}
+                  disabled={loading}
+                >
+                  {loading ? "Sending..." : "Continue →"}
+                </button>
+              </div>
+            )}
+
+            <p className="text-xs text-gray-400 text-center">
+              By continuing, you agree to our{" "}
+              <button onClick={() => navigate("/terms")} className="underline text-gray-500">
+                Terms
+              </button>
+              {" & "}
+              <button onClick={() => navigate("/privacy")} className="underline text-gray-500">
+                Privacy Policy
+              </button>
+            </p>
+
+            {/* Discreet admin escape hatch — keeps phone login reachable
+                for admins while SMS is unavailable to regular users. */}
+            {!PHONE_LOGIN_ENABLED && !showPhone && (
+              <button
+                onClick={() => setShowPhone(true)}
+                className="w-full text-center text-[11px] text-gray-300 hover:text-gray-500 pt-2"
+              >
+                Admin login
+              </button>
+            )}
+
+            {/* ─── Dev-only: quick login shortcuts ────────────────────────── */}
+            {import.meta.env.DEV && (
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 text-center font-semibold mb-2">
+                  🔧 Dev Quick Login
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => handleDevLogin("9999999999")}
+                    disabled={loading}
+                    className="text-xs py-2 px-2 rounded-lg border border-violet-200 bg-violet-50 text-violet-700 font-medium hover:bg-violet-100 disabled:opacity-50"
+                  >
+                    💎 Admin
+                  </button>
+                  <button
+                    onClick={() => handleDevLogin("8888888888")}
+                    disabled={loading}
+                    className="text-xs py-2 px-2 rounded-lg border border-amber-200 bg-amber-50 text-amber-700 font-medium hover:bg-amber-100 disabled:opacity-50"
+                  >
+                    🥇 Dater
+                  </button>
+                  <button
+                    onClick={() => handleDevLogin("7777777777")}
+                    disabled={loading}
+                    className="text-xs py-2 px-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 font-medium hover:bg-emerald-100 disabled:opacity-50"
+                  >
+                    🤝 Friend
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-400 text-center mt-2">
+                  Or use any phone + OTP{" "}
+                  <code className="font-mono bg-gray-100 px-1 rounded">000000</code>
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>

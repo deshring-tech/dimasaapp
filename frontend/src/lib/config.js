@@ -17,3 +17,10 @@ export const SOCKET_URL = API_ORIGIN || "/";
 
 // Google Sign-In client ID. When unset, the Google button is hidden.
 export const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || "";
+
+// Phone/OTP login. Hidden by default because there's no SMS provider wired yet —
+// showing it would send users into a dead end (they'd never receive a code).
+// Set VITE_ENABLE_PHONE_LOGIN=true once SMS (MSG91/Twilio/WhatsApp) is live.
+// Admins can still reveal the form via the discreet link on the login screen.
+export const PHONE_LOGIN_ENABLED =
+  String(import.meta.env.VITE_ENABLE_PHONE_LOGIN || "").toLowerCase() === "true";
