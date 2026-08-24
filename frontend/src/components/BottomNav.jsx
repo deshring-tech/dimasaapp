@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
-import { getMatches } from "../api";
+import { getUnreadCount } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { isCommunityMode } from "../lib/mode";
 
@@ -33,11 +33,8 @@ export default function BottomNav() {
     if (now - lastFetched.current < 30_000) return;
     lastFetched.current = now;
 
-    getMatches()
-      .then((res) => {
-        const unread = res.data.filter((m) => m.unread).length;
-        setUnreadCount(unread);
-      })
+    getUnreadCount()
+      .then((res) => setUnreadCount(res.data.count ?? 0))
       .catch(() => {});
   }, [location.pathname]);
 

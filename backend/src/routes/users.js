@@ -139,13 +139,13 @@ router.get("/discover", protect, async (req, res, next) => {
     const currentUser = await prisma.user.findUnique({ where: { id: req.user.id } });
     await ensureFreshDailyCount(prisma, currentUser);
 
-    // IDs already interacted with
-    const interacted = await prisma.interest.findMany({
-      where: { fromUserId: req.user.id },
-      select: { toUserId: true },
-    });
-    const excludeIds = interacted.map((i) => i.toUserId);
-    excludeIds.push(req.user.id);
+    // Exclude self + anyone I've already reached out to.
+    // Uses a NOT EXISTS subquery rather than loading every interacted ID into
+    // memory — stays fast no matter how many people the user has contacted.
+    const notAlreadyContacted = {
+      id: { not: req.user.id },
+      receivedInterests: { none: { fromUserId: req.user.id } },
+    };
 
     // ── COMMUNITY MODE ───────────────────────────────────────────────────
     if (currentUser.intent === "friends") {
@@ -154,7 +154,7 @@ router.get("/discover", protect, async (req, res, next) => {
       // If user filtered by a specific locality, restrict the query.
       // Otherwise: fetch everyone and sort by proximity (same locality > same district > elsewhere).
       const where = {
-        id: { notIn: excludeIds },
+        ...notAlreadyContacted,
         isSetup: true,
         intent: "friends",
       };
@@ -213,7 +213,7 @@ router.get("/discover", protect, async (req, res, next) => {
 
     const profiles = await prisma.user.findMany({
       where: {
-        id: { notIn: excludeIds },
+        ...notAlreadyContacted,
         isSetup: true,
         intent: { in: ["dating", "serious"] },
         tier: { in: visibleTiers },

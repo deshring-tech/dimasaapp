@@ -20,13 +20,40 @@ export default function Chat() {
   const words = modeWords(user);
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [nextCursor, setNextCursor] = useState(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  // API returns { matches, nextCursor }; tolerate a bare array from older builds.
+  const unwrap = (data) =>
+    Array.isArray(data)
+      ? { list: data, cursor: null }
+      : { list: data.matches ?? [], cursor: data.nextCursor ?? null };
 
   useEffect(() => {
     getMatches()
-      .then((res) => setMatches(res.data))
+      .then((res) => {
+        const { list, cursor } = unwrap(res.data);
+        setMatches(list);
+        setNextCursor(cursor);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  const loadMore = async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await getMatches(nextCursor);
+      const { list, cursor } = unwrap(res.data);
+      setMatches((prev) => [...prev, ...list]);
+      setNextCursor(cursor);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -123,6 +150,18 @@ export default function Chat() {
               </div>
             </button>
           ))}
+
+          {nextCursor && (
+            <div className="p-4 text-center">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="text-sm font-semibold text-primary px-5 py-2 rounded-xl border-2 border-rose-200 disabled:opacity-50"
+              >
+                {loadingMore ? "Loading..." : "Load more"}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

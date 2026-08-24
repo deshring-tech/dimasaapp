@@ -62,6 +62,7 @@ model Interest {
   createdAt  DateTime @default(now())
 
   @@unique([fromUserId, toUserId])
+  @@index([toUserId])   // "who liked me" + discovery exclusion subquery
 }
 
 model Match {
@@ -74,6 +75,8 @@ model Match {
   messages  Message[]
 
   @@unique([user1Id, user2Id])
+  @@index([user1Id])    // match lists filter on either side
+  @@index([user2Id])
 }
 
 model Message {
@@ -87,6 +90,7 @@ model Message {
   createdAt DateTime @default(now())
 
   @@index([matchId])
+  @@index([senderId])   // unread counts filter by sender
 }
 
 // ─── Feed ─────────────────────────────────────────────────────────────────

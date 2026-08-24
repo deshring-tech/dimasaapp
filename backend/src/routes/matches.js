@@ -5,6 +5,8 @@ const { protect } = require("../middleware/auth");
 const { dailyLimitFor, getRank, ensureFreshDailyCount } = require("../lib/tiers");
 const { emitToUser } = require("../socket/chat");
 
+const MATCH_PAGE_SIZE = 30;
+
 // ─── Who liked me (Gold+ feature) — MUST be before /:targetId ───────────────
 // GET /api/matches/liked-me
 router.get("/liked-me", protect, async (req, res, next) => {
@@ -61,13 +63,34 @@ router.get("/:matchId/partner", protect, async (req, res, next) => {
   }
 });
 
-// ─── Get All Matches ──────────────────────────────────────────────────────────
-// GET /api/matches
+// ─── Unread conversation count (cheap — powers the nav badge) ───────────────
+// GET /api/matches/unread-count
+// A grouped count instead of pulling every match with its last message.
+router.get("/unread-count", protect, async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    const rows = await prisma.message.groupBy({
+      by: ["matchId"],
+      where: {
+        read: false,
+        senderId: { not: userId },
+        match: { OR: [{ user1Id: userId }, { user2Id: userId }] },
+      },
+    });
+    res.json({ count: rows.length });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ─── Get Matches (paginated) ─────────────────────────────────────────────────
+// GET /api/matches?cursor=<matchId>
 router.get("/", protect, async (req, res, next) => {
   try {
     const userId = req.user.id;
+    const { cursor } = req.query;
 
-    const matches = await prisma.match.findMany({
+    const rows = await prisma.match.findMany({
       where: { OR: [{ user1Id: userId }, { user2Id: userId }] },
       include: {
         user1: { select: { id: true, name: true, photoUrl: true, location: true } },
@@ -79,9 +102,11 @@ router.get("/", protect, async (req, res, next) => {
         },
       },
       orderBy: { createdAt: "desc" },
+      take: MATCH_PAGE_SIZE,
+      ...(cursor ? { cursor: { id: String(cursor) }, skip: 1 } : {}),
     });
 
-    const formatted = matches.map((match) => {
+    const matches = rows.map((match) => {
       const other = match.user1Id === userId ? match.user2 : match.user1;
       return {
         matchId: match.id,
@@ -95,7 +120,10 @@ router.get("/", protect, async (req, res, next) => {
       };
     });
 
-    res.json(formatted);
+    const nextCursor =
+      rows.length === MATCH_PAGE_SIZE ? rows[rows.length - 1].id : null;
+
+    res.json({ matches, nextCursor });
   } catch (err) {
     next(err);
   }
